@@ -1,5 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { ProductClient } from './components/product-client';
+import { ProductWithRelations } from './components/columns';
+import { Product } from '@/lib/generated/prisma';
 
 export default async function InventoryPage() {
   const [products, categories, vendors] = await Promise.all([
@@ -11,14 +13,17 @@ export default async function InventoryPage() {
     prisma.vendor.findMany(),
   ]);
 
-  // We no longer format the products here. We pass the raw data.
+  // We can assert the type here as we know we included the relations
+  const productsWithRelations: ProductWithRelations[] = products as ProductWithRelations[];
+
   return (
     <div className="flex-col">
       <div className="flex-1 space-y-4 p-8 pt-6">
         <ProductClient
-          data={products} // Pass the raw products array
+          data={productsWithRelations}
           categories={categories}
           vendors={vendors}
+          allProducts={products as Product[]} // THIS IS THE NEW PROP
         />
       </div>
     </div>

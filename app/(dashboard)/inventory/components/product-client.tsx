@@ -15,18 +15,20 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 
 import { columns, ProductWithRelations } from "./columns"; // Ensure correct import
 import { ProductForm } from "./product-form";
-import { Category, Vendor } from "@/lib/generated/prisma";
+import { Category, Product, Vendor } from "@/lib/generated/prisma";
 
 interface ProductClientProps {
   data: ProductWithRelations[];
   categories: Category[];
   vendors: Vendor[];
+  allProducts: Product[];
 }
 
 export const ProductClient: React.FC<ProductClientProps> = ({
   data,
   categories,
   vendors,
+  allProducts, // 2. Receive the new prop
 }) => {
   const router = useRouter();
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -66,7 +68,7 @@ export const ProductClient: React.FC<ProductClientProps> = ({
   return (
     <>
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent>
+      <DialogContent className="max-w-3xl">
           <DialogHeader>
             <DialogTitle>{editingProduct ? "Edit product" : "Add new product"}</DialogTitle>
           </DialogHeader>
@@ -74,6 +76,7 @@ export const ProductClient: React.FC<ProductClientProps> = ({
             initialData={editingProduct}
             categories={categories}
             vendors={vendors}
+            allProducts={allProducts} // 3. Pass the prop down to the form
             onCancel={() => setIsModalOpen(false)}
           />
         </DialogContent>

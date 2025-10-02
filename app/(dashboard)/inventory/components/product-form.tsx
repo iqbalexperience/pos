@@ -12,12 +12,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { ProductWithRelations } from "./columns";
+import { Separator } from "@/components/ui/separator";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from "@/components/ui/command";
+import { Check, ChevronsUpDown } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 
 interface ProductFormProps {
-  initialData: ProductWithRelations | null; // Use the correct type
+  initialData: ProductWithRelations | null;
   categories: Category[];
   vendors: Vendor[];
+  allProducts: Product[];
   onCancel: () => void;
 }
 
@@ -25,6 +31,7 @@ export const ProductForm: React.FC<ProductFormProps> = ({
   initialData,
   categories,
   vendors,
+  allProducts,
   onCancel,
 }) => {
   const router = useRouter();
@@ -52,6 +59,8 @@ export const ProductForm: React.FC<ProductFormProps> = ({
       isAgeRestricted: false,
       categoryId: "",
       vendorId: null,
+      caseUnitCount: undefined,
+      containsProductId: undefined,
     },
   });
 
@@ -59,30 +68,40 @@ export const ProductForm: React.FC<ProductFormProps> = ({
     try {
       setLoading(true);
 
-      // THIS IS THE KEY FIX:
-      // We destructure the nested 'category' and 'vendor' objects out of the form data.
-      // 'productData' will now only contain fields that are part of the Product model.
       const { category, vendor, ...productData } = data;
 
-      // We then parse the numeric fields to ensure they are numbers, not strings.
       const submissionData = {
         ...productData,
-        price: parseFloat(String(productData.price)),
-        cost: parseFloat(String(productData.cost)),
-        stockQuantity: parseInt(String(productData.stockQuantity), 10),
+        price: parseFloat(String(productData.price) || "0"),
+        cost: parseFloat(String(productData.cost) || "0"),
+        stockQuantity: parseInt(String(productData.stockQuantity) || "0", 10),
       };
+
+      // THIS IS THE FIX:
+      // We clean the data to avoid sending 'null' or empty values for optional fields,
+      // which can cause issues with Prisma's create/update operations on unique constraints.
+      if (!submissionData.containsProductId) {
+        delete (submissionData as any).containsProductId;
+      }
+      if (!submissionData.caseUnitCount || submissionData.caseUnitCount <= 0) {
+        delete (submissionData as any).caseUnitCount;
+      }
+       if (!submissionData.vendorId) {
+        delete (submissionData as any).vendorId;
+      }
 
       if (initialData) {
         await axios.patch(`/api/products/${initialData.id}`, submissionData);
       } else {
         await axios.post("/api/products", submissionData);
       }
-      
+
       router.refresh();
       toast.success(toastMessage);
       onCancel();
     } catch (error:any) {
       toast.error(error.response?.data || "Something went wrong.");
+      console.error(error);
     } finally {
       setLoading(false);
     }
@@ -151,6 +170,51 @@ export const ProductForm: React.FC<ProductFormProps> = ({
         <Button disabled={loading} variant="outline" onClick={onCancel} type="button">Cancel</Button>
         <Button disabled={loading} type="submit">{actionLabel}</Button>
       </div>
+
+      <Separator />
+      
+      <div className="space-y-2">
+        <h3 className="text-lg font-medium">Case Properties (Optional)</h3>
+        <p className="text-sm text-muted-foreground">
+          If this product is a case, define what it contains and how many units.
+        </p>
+        <div className="grid grid-cols-2 gap-4">
+          <Controller
+            name="containsProductId"
+            control={control}
+            render={({ field }) => (
+              <Popover>
+                <PopoverTrigger asChild><Button variant="outline" role="combobox" className="w-full justify-between">{field.value ? allProducts.find((p) => p.id === field.value)?.name : "Select contained 'each' product..."}<ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button></PopoverTrigger>
+                <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                  <Command><CommandInput placeholder="Search product..." /><CommandEmpty>No product found.</CommandEmpty><CommandGroup>
+                    {/* 3. This 'allProducts.map' will now work correctly */}
+                    {allProducts.map((product) => (
+                      <CommandItem key={product.id} value={product.id} onSelect={(currentValue) => { field.onChange(currentValue === field.value ? null : currentValue); }}>
+                        <Check className={cn("mr-2 h-4 w-4", field.value === product.id ? "opacity-100" : "opacity-0")} />
+                        {product.name}
+                      </CommandItem>
+                    ))}
+                  </CommandGroup></Command>
+                </PopoverContent>
+              </Popover>
+            )}
+          />
+          <Input 
+            type="number" 
+            {...register("caseUnitCount", { 
+              valueAsNumber: true, 
+              validate: v => (!v || v > 0) || "Must be greater than 0"
+            })} 
+            placeholder="Units per Case (e.g., 12)" 
+          />
+        </div>
+      </div>
+      
+      <div className="pt-6 space-x-2 flex items-center justify-end w-full">
+        <Button disabled={loading} variant="outline" onClick={onCancel} type="button">Cancel</Button>
+        <Button disabled={loading} type="submit">{initialData ? "Save changes" : "Create"}</Button>
+      </div>
+
     </form>
   );
 };
