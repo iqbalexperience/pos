@@ -68,6 +68,16 @@ export const useCartStore = create<CartState>((set, get) => ({
     }
     const { items } = get();
     const existingItem = items.find((item) => item.product.id === product.id);
+    const quantityInCart = existingItem ? existingItem.quantity : 0;
+
+    // THIS IS THE NEW CHECK
+    if (quantityInCart >= product.stockQuantity) {
+      toast.error("Maximum stock reached.", {
+        description: `You cannot add more of "${product.name}". Only ${product.stockQuantity} are available.`,
+      });
+      return;
+    }
+
     const updatedItems = existingItem
       ? items.map((item) => item.product.id === product.id ? { ...item, quantity: item.quantity + 1 } : item)
       : [...items, { product, quantity: 1 }];
@@ -75,9 +85,19 @@ export const useCartStore = create<CartState>((set, get) => ({
     toast.success(`${product.name} added to cart.`);
   },
 
+
+
   addVerifiedItem: (product) => {
     const { items } = get();
     const existingItem = items.find((item) => item.product.id === product.id);
+    const quantityInCart = existingItem ? existingItem.quantity : 0;
+
+    // / THIS IS THE NEW CHECK
+    if (quantityInCart >= product.stockQuantity) {
+      toast.error("Maximum stock reached.");
+      return;
+    }
+
     const updatedItems = existingItem
       ? items.map((item) => item.product.id === product.id ? { ...item, quantity: item.quantity + 1 } : item)
       : [...items, { product, quantity: 1 }];
@@ -105,15 +125,26 @@ export const useCartStore = create<CartState>((set, get) => ({
   },
 
   updateQuantity: (productId, quantity) => {
-    const itemToUpdate = get().items.find(item => item.product.id === productId);
-    if(itemToUpdate?.product.isWeighed || get().mode === 'return') {
+    const { items } = get();
+    const itemToUpdate = items.find(item => item.product.id === productId);
+    if(!itemToUpdate) return;
+
+    if (itemToUpdate?.product.isWeighed || get().mode === 'return') {
       toast.error("Cannot change quantity for this item.");
       return;
     }
-    const updatedItems = (quantity < 1)
-      ? get().items.filter((item) => item.product.id !== productId)
-      : get().items.map((item) => item.product.id === productId ? { ...item, quantity } : item);
-    set({ items: updatedItems, ...calculateTotals(updatedItems) });
+
+    // / THIS IS THE NEW CHECK
+    if (quantity > itemToUpdate.product.stockQuantity) {
+      toast.error("Maximum stock reached.", {
+        description: `Only ${itemToUpdate.product.stockQuantity} are available.`,
+      });
+      // Set to max available instead of doing nothing
+      const updatedItems = items.map((item) => item.product.id === productId ? { ...item, quantity: itemToUpdate.product.stockQuantity } : item);
+      set({ items: updatedItems, ...calculateTotals(updatedItems) });
+      return;
+    }
+
   },
 
   clearCart: () => {

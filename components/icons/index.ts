@@ -11,6 +11,7 @@ import {
   File,
   ListFilter,
   Search,
+  AlarmClock,
 } from 'lucide-react';
 
 // We only need to export the object containing the components.
@@ -27,4 +28,5 @@ export const Icons = {
   file: File,
   filter: ListFilter,
   search: Search,
+  reports: AlarmClock,
 };

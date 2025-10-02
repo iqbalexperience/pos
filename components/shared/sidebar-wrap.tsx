@@ -23,6 +23,7 @@ const navItems: NavItem[] = [
   { href: '/dashboard', icon: 'dashboard', label: 'Dashboard' },
   { href: '/inventory', icon: 'products', label: 'Inventory' },
   { href: '/employees', icon: 'users', label: 'Employees' },
+  { href: '/inventory/reports/expiration', icon: 'reports', label: 'Expiration Report' },
 ];
 
 export function SidebarWrap() {
