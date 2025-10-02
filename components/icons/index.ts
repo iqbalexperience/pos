@@ -1,0 +1,30 @@
+import {
+  LayoutDashboard,
+  Users,
+  Boxes,
+  ShoppingCart,
+  Settings,
+  ChevronLeft,
+  ChevronRight,
+  MoreHorizontal,
+  PlusCircle,
+  File,
+  ListFilter,
+  Search,
+} from 'lucide-react';
+
+// We only need to export the object containing the components.
+export const Icons = {
+  dashboard: LayoutDashboard,
+  users: Users,
+  products: Boxes,
+  cart: ShoppingCart,
+  settings: Settings,
+  chevronLeft: ChevronLeft,
+  chevronRight: ChevronRight,
+  ellipsis: MoreHorizontal,
+  add: PlusCircle,
+  file: File,
+  filter: ListFilter,
+  search: Search,
+};

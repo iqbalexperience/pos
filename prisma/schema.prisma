@@ -1,0 +1,151 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Role {
+  id          String     @id @default(cuid())
+  name        String     @unique // e.g., "Cashier", "Manager", "Admin"
+  // Permissions stored as a comma-separated string, e.g., "view_products,edit_products"
+  permissions String
+  employees   Employee[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
+
+model Employee {
+  id        String   @id @default(cuid())
+  firstName String
+  lastName  String
+  pin       String   @unique // 4 to 6 digit PIN for login
+  isActive  Boolean  @default(true)
+  roleId    String
+  role      Role     @relation(fields: [roleId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Department {
+  id         String     @id @default(cuid())
+  name       String     @unique
+  categories Category[]
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+}
+
+model Category {
+  id           String     @id @default(cuid())
+  name         String
+  departmentId String
+  department   Department @relation(fields: [departmentId], references: [id])
+  products     Product[]
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@unique([name, departmentId])
+}
+
+model Vendor {
+  id        String    @id @default(cuid())
+  name      String    @unique
+  products  Product[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Product {
+  id               String   @id @default(cuid())
+  name             String
+  sku              String   @unique
+  barcode          String?  @unique
+  price            Float
+  cost             Float
+  // This field now represents the TOTAL stock across all lots.
+  // We will keep it updated for fast lookups.
+  stockQuantity    Int
+  unit             String
+  isWeighed        Boolean  @default(false)
+  isAgeRestricted  Boolean  @default(false)
+  categoryId       String
+  category         Category @relation(fields: [categoryId], references: [id])
+  vendorId         String?
+  vendor           Vendor?  @relation(fields: [vendorId], references: [id])
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  
+  // Add relation to the new InventoryLot model
+  inventoryLots    InventoryLot[]
+}
+
+// ADD THIS NEW MODEL
+model InventoryLot {
+  id                 String    @id @default(cuid())
+  receivedAt         DateTime  @default(now())
+  quantityReceived   Int
+  quantityRemaining  Int
+  expirationDate     DateTime? // Optional, for non-perishable items
+
+  productId          String
+  product            Product   @relation(fields: [productId], references: [id])
+}
+
+model Customer {
+  id            String   @id @default(cuid())
+  firstName     String
+  lastName      String
+  phone         String?  @unique
+  email         String?  @unique
+  loyaltyPoints Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// Add this new Enum for payment types
+enum TenderType {
+  CASH
+  CARD
+  EBT
+  SPLIT
+  OTHER
+}
+
+model Transaction {
+  id             String            @id @default(cuid())
+  createdAt      DateTime          @default(now())
+  items          TransactionItem[]
+  subtotal       Float
+  tax            Float
+  total          Float
+  tenderType     TenderType
+  amountTendered Float? // Used for cash transactions
+  changeGiven    Float? // Used for cash transactions
+  refundedById   String?           @unique
+
+  // Later we can add relations to Employee and Customer
+  // employeeId      String
+  // customerId      String?
+}
+
+model TransactionItem {
+  id            String      @id @default(cuid())
+  transactionId String
+  transaction   Transaction @relation(fields: [transactionId], references: [id])
+
+  // A snapshot of the product at the time of sale
+  productId String
+  name      String
+  price     Float // Price at the time of sale
+  quantity  Int
+  weight    Float? // Weight at the time of sale
+}
