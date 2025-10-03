@@ -13,6 +13,7 @@ import {
   Search,
   AlarmClock,
   PackageOpen,
+  Ticket,
 } from 'lucide-react';
 
 // We only need to export the object containing the components.
@@ -30,5 +31,6 @@ export const Icons = {
   filter: ListFilter,
   search: Search,
   reports: AlarmClock,
-  case: PackageOpen
+  case: PackageOpen,
+  promotions: Ticket 
 };

@@ -83,7 +83,7 @@ model Product {
   vendor           Vendor?  @relation(fields: [vendorId], references: [id])
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
-  
+  promotions      Promotion[]
   // Add relation to the new InventoryLot model
   inventoryLots    InventoryLot[]
   // START: NEW FIELDS FOR CASE BREAKING
@@ -118,6 +118,7 @@ model Customer {
   phone         String?  @unique
   email         String?  @unique
   loyaltyPoints Int      @default(0)
+  transactions    Transaction[]
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 }
@@ -142,7 +143,9 @@ model Transaction {
   amountTendered Float? // Used for cash transactions
   changeGiven    Float? // Used for cash transactions
   refundedById   String?           @unique
-
+// ADD THESE TWO LINES
+  customerId      String?
+  customer        Customer?         @relation(fields: [customerId], references: [id])
   // Later we can add relations to Employee and Customer
   // employeeId      String
   // customerId      String?
@@ -159,4 +162,29 @@ model TransactionItem {
   price     Float // Price at the time of sale
   quantity  Int
   weight    Float? // Weight at the time of sale
+}
+
+// Add this new Enum for different promotion types
+enum PromotionType {
+  PERCENTAGE_OFF_PRODUCT
+  BOGO // Buy One, Get One
+  MULTI_BUY // e.g., 2 for $5
+}
+
+
+// ADD THIS NEW MODEL
+model Promotion {
+  id              String        @id @default(cuid())
+  description     String
+  type            PromotionType
+  discountValue   Float // For PERCENTAGE, this is the percentage (e.g., 10 for 10%)
+  startDate       DateTime
+  endDate         DateTime?
+  isActive        Boolean       @default(true)
+
+  // Many-to-many relationship with Product
+  products        Product[]
+  
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 }

@@ -21,10 +21,14 @@ type NavItem = {
 
 const navItems: NavItem[] = [
   { href: '/dashboard', icon: 'dashboard', label: 'Dashboard' },
+  { href: '/checkout', icon: 'cart', label: 'Checkout' },
+  { href: 'promotions', icon: 'promotions', label: 'Promotions' },
+  { href: '/customers', icon: 'users', label: 'Customers' },
   { href: '/inventory', icon: 'products', label: 'Inventory' },
   { href: '/inventory/break-case', icon: 'case', label: 'Break Case' }, // Add this
-  { href: '/employees', icon: 'users', label: 'Employees' },
   { href: '/inventory/reports/expiration', icon: 'reports', label: 'Expiration Report' },
+  { href: '/employees', icon: 'users', label: 'Employees' },
+
 ];
 
 export function SidebarWrap() {

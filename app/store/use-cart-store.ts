@@ -1,24 +1,30 @@
 import { create } from 'zustand';
 import { toast } from 'sonner';
-import { Product } from '@/lib/generated/prisma';
+import { Product, Promotion } from '@/lib/generated/prisma';
 
 export type CartItem = {
   product: Product;
   quantity: number;
   weight?: number;
+  discountApplied: number;
 };
+
+type PromotionWithProductIds = Promotion & { products: { id: string }[] };
 
 type CartState = {
   items: CartItem[];
   mode: 'sale' | 'return';
+  activePromotions: PromotionWithProductIds[];
   weighedItem: Product | null;
   ageRestrictedItem: Product | null;
   totalItems: number;
   subtotal: number;
+  discounts: number;
+  setPromotions: (promotions: PromotionWithProductIds[]) => void;
   setMode: (mode: 'sale' | 'return') => void;
   setWeighedItem: (product: Product | null) => void;
   setAgeRestrictedItem: (product: Product | null) => void;
-  loadReturnItems: (items: CartItem[]) => void; // New action
+  loadReturnItems: (items: CartItem[]) => void;
   addItem: (product: Product) => void;
   addWeighedItem: (product: Product, weight: number) => void;
   addVerifiedItem: (product: Product) => void;
@@ -27,127 +33,126 @@ type CartState = {
   clearCart: () => void;
 };
 
-const calculateTotals = (items: CartItem[]) => {
-  const totalItems = items.reduce((total, item) => total + item.quantity, 0);
-  const subtotal = items.reduce((total, item) => {
-    const itemPrice = item.weight ? item.product.price * item.weight * Math.sign(item.quantity) : item.product.price * item.quantity;
-    return total + itemPrice;
-  }, 0);
-  return { totalItems, subtotal };
+const calculateTotals = (items: CartItem[], promotions: PromotionWithProductIds[], mode: 'sale' | 'return') => {
+  let totalItems = 0;
+  let subtotal = 0;
+  let totalDiscounts = 0;
+
+  const processedItems = items.map(item => {
+    totalItems += item.quantity;
+    const lineSubtotal = item.weight ? item.product.price * item.weight * Math.sign(item.quantity) : item.product.price * item.quantity;
+    subtotal += lineSubtotal;
+
+    let discountApplied = 0;
+    if (mode === 'sale') {
+      const applicablePromotion = promotions.find(promo => 
+        promo.type === 'PERCENTAGE_OFF_PRODUCT' && 
+        promo.products.some(p => p.id === item.product.id)
+      );
+
+      if (applicablePromotion) {
+        discountApplied = lineSubtotal * (applicablePromotion.discountValue / 100);
+        totalDiscounts += discountApplied;
+      }
+    }
+    return { ...item, discountApplied };
+  });
+
+  return { items: processedItems, totalItems, subtotal, discounts: totalDiscounts };
 };
 
 export const useCartStore = create<CartState>((set, get) => ({
   items: [],
   mode: 'sale',
+  activePromotions: [],
   weighedItem: null,
   ageRestrictedItem: null,
   totalItems: 0,
   subtotal: 0,
+  discounts: 0,
 
-  setMode: (mode) => set({ mode, items: [], ...calculateTotals([]) }),
+  setPromotions: (promotions) => {
+    set({ activePromotions: promotions });
+    const { items, mode } = get();
+    set(calculateTotals(items, promotions, mode));
+  },
+
+  setMode: (mode) => set({ mode, ...calculateTotals([], get().activePromotions, mode) }),
   setWeighedItem: (product) => set({ weighedItem: product }),
   setAgeRestrictedItem: (product) => set({ ageRestrictedItem: product }),
-
-  // New action to load a cart for a return
+  
   loadReturnItems: (items) => {
-    set({ items, ...calculateTotals(items) });
+    set(calculateTotals(items, get().activePromotions, 'return'));
   },
 
   addItem: (product) => {
-    if (get().mode === 'return') {
-      toast.error("Cannot add products in Return Mode.");
-      return;
-    }
-    if (product.isAgeRestricted) {
-      set({ ageRestrictedItem: product });
-      return;
-    }
-    if (product.isWeighed) {
-      set({ weighedItem: product });
-      return;
-    }
-    const { items } = get();
+    if (get().mode === 'return') { toast.error("Cannot add products in Return Mode."); return; }
+    if (product.isAgeRestricted) { set({ ageRestrictedItem: product }); return; }
+    if (product.isWeighed) { set({ weighedItem: product }); return; }
+
+    const { items, activePromotions, mode } = get();
     const existingItem = items.find((item) => item.product.id === product.id);
     const quantityInCart = existingItem ? existingItem.quantity : 0;
-
-    // THIS IS THE NEW CHECK
-    if (quantityInCart >= product.stockQuantity) {
-      toast.error("Maximum stock reached.", {
-        description: `You cannot add more of "${product.name}". Only ${product.stockQuantity} are available.`,
-      });
-      return;
-    }
+    if (quantityInCart >= product.stockQuantity) { toast.error("Maximum stock reached."); return; }
 
     const updatedItems = existingItem
       ? items.map((item) => item.product.id === product.id ? { ...item, quantity: item.quantity + 1 } : item)
-      : [...items, { product, quantity: 1 }];
-    set({ items: updatedItems, ...calculateTotals(updatedItems) });
+      : [...items, { product, quantity: 1, discountApplied: 0 }];
+    
+    set(calculateTotals(updatedItems, activePromotions, mode));
     toast.success(`${product.name} added to cart.`);
   },
 
-
-
   addVerifiedItem: (product) => {
-    const { items } = get();
+    const { items, activePromotions, mode } = get();
     const existingItem = items.find((item) => item.product.id === product.id);
     const quantityInCart = existingItem ? existingItem.quantity : 0;
-
-    // / THIS IS THE NEW CHECK
-    if (quantityInCart >= product.stockQuantity) {
-      toast.error("Maximum stock reached.");
-      return;
-    }
-
+    if (quantityInCart >= product.stockQuantity) { toast.error("Maximum stock reached."); return; }
+    
     const updatedItems = existingItem
       ? items.map((item) => item.product.id === product.id ? { ...item, quantity: item.quantity + 1 } : item)
-      : [...items, { product, quantity: 1 }];
-    set({ items: updatedItems, ...calculateTotals(updatedItems) });
+      : [...items, { product, quantity: 1, discountApplied: 0 }];
+
+    set(calculateTotals(updatedItems, activePromotions, mode));
     toast.success(`${product.name} added to cart.`);
   },
 
   addWeighedItem: (product, weight) => {
-    if (weight <= 0) {
-      toast.error("Weight must be greater than zero.");
-      return;
-    }
-    const { items } = get();
-    const updatedItems = [...items, { product, quantity: 1, weight }];
-    set({ items: updatedItems, ...calculateTotals(updatedItems) });
+    if (weight <= 0) { toast.error("Weight must be greater than zero."); return; }
+    const { items, activePromotions, mode } = get();
+    const updatedItems = [...items, { product, quantity: 1, weight, discountApplied: 0 }];
+    set(calculateTotals(updatedItems, activePromotions, mode));
     toast.success(`${product.name} (${weight} lbs) added to cart.`);
   },
 
-  removeItem: (productId: string) => {
-    const { items } = get();
+  removeItem: (productId) => {
+    const { items, activePromotions, mode } = get();
     const itemToRemove = items.find(item => item.product.id === productId);
     const updatedItems = items.filter(item => item.product.id !== productId);
-    set({ items: updatedItems, ...calculateTotals(updatedItems) });
+    set(calculateTotals(updatedItems, activePromotions, mode));
     if (itemToRemove) toast.info(`${itemToRemove.product.name} removed from cart.`);
   },
 
   updateQuantity: (productId, quantity) => {
-    const { items } = get();
+    const { items, activePromotions, mode } = get();
     const itemToUpdate = items.find(item => item.product.id === productId);
     if(!itemToUpdate) return;
+    if(itemToUpdate.product.isWeighed || get().mode === 'return') { toast.error("Cannot change quantity."); return; }
 
-    if (itemToUpdate?.product.isWeighed || get().mode === 'return') {
-      toast.error("Cannot change quantity for this item.");
-      return;
-    }
-
-    // / THIS IS THE NEW CHECK
     if (quantity > itemToUpdate.product.stockQuantity) {
-      toast.error("Maximum stock reached.", {
-        description: `Only ${itemToUpdate.product.stockQuantity} are available.`,
-      });
-      // Set to max available instead of doing nothing
+      toast.error("Maximum stock reached.");
       const updatedItems = items.map((item) => item.product.id === productId ? { ...item, quantity: itemToUpdate.product.stockQuantity } : item);
-      set({ items: updatedItems, ...calculateTotals(updatedItems) });
+      set(calculateTotals(updatedItems, activePromotions, mode));
       return;
     }
-
+    
+    const updatedItems = (quantity < 1)
+      ? items.filter((item) => item.product.id !== productId)
+      : items.map((item) => item.product.id === productId ? { ...item, quantity } : item);
+    set(calculateTotals(updatedItems, activePromotions, mode));
   },
 
   clearCart: () => {
-    set({ items: [], totalItems: 0, subtotal: 0, weighedItem: null, ageRestrictedItem: null, mode: 'sale' });
+    set({ items: [], totalItems: 0, subtotal: 0, discounts: 0, weighedItem: null, ageRestrictedItem: null, mode: 'sale' });
   },
 }));
