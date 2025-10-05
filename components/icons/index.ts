@@ -14,6 +14,8 @@ import {
   AlarmClock,
   PackageOpen,
   Ticket,
+  PieChart,
+  SlidersHorizontal,
 } from 'lucide-react';
 
 // We only need to export the object containing the components.
@@ -30,7 +32,7 @@ export const Icons = {
   file: File,
   filter: ListFilter,
   search: Search,
-  reports: AlarmClock,
+  reports: PieChart,
   case: PackageOpen,
-  promotions: Ticket 
+  promotions: Ticket,
 };

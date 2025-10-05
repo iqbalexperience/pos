@@ -34,8 +34,10 @@ export async function POST(req: Request) {
               productId: item.product.id,
               name: item.product.name,
               price: item.product.price,
+              cost: item.product.cost, // THIS IS THE NEW LINE
               quantity: item.quantity,
               weight: item.weight,
+              discountAmount: item.discountApplied,
             })),
           },
         },
@@ -44,7 +46,7 @@ export async function POST(req: Request) {
       if (isRefund && originalTransactionId) {
         await tx.transaction.update({ where: { id: originalTransactionId }, data: { refundedById: createdTransaction.id } });
       }
-      
+
       if (!isRefund && customerId) {
         const pointsToAdd = Math.floor(total);
         if (pointsToAdd > 0) {
@@ -64,7 +66,7 @@ export async function POST(req: Request) {
           data: { stockQuantity: { [stockUpdateOperation]: quantity } },
         });
       }
-      
+
       return createdTransaction;
     });
 
